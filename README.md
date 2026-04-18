@@ -44,7 +44,7 @@ Below is the system architecture:
 ▶️ Demo Video
 
 👉 Demo Link:
-YOUR_VIDEO_LINK_HERE
+https://github.com/PriyankaPyCoder/AttentionX-AI-Hackathon/blob/main/Demo_Video.mp4
 
 ---
 
