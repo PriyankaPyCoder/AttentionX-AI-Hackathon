@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Content Repurposing Engine — Architecture</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --red:    #e94560;
+    --yellow: #ffe135;
+    --blue:   #00d4ff;
+    --green:  #00ff9d;
+    --bg:     #080810;
+    --panel:  #11111f;
+    --border: #1e1e3a;
+    --text:   #c8c8e8;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    padding: 40px 20px 60px;
+    overflow-x: hidden;
+  }
+
+  /* Subtle grid background */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(233,69,96,.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(233,69,96,.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 52px;
+    animation: fadeDown .6s ease both;
+  }
+  header .badge {
+    display: inline-block;
+    background: var(--red);
+    color: #fff;
+    font-family: 'Space Mono', monospace;
+    font-size: .72rem;
+    letter-spacing: .12em;
+    padding: 4px 14px;
+    border-radius: 20px;
+    margin-bottom: 16px;
+    text-transform: uppercase;
+  }
+  header h1 {
+    font-size: clamp(1.8rem, 4vw, 3rem);
+    font-weight: 800;
+    color: #fff;
+    line-height: 1.1;
+  }
+  header h1 span { color: var(--red); }
+  header p {
+    margin-top: 10px;
+    color: #666;
+    font-size: .95rem;
+    font-family: 'Space Mono', monospace;
+  }
+
+  /* ── Pipeline Flow ─────────────────────────────────────── */
+  .pipeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  .step {
+    display: grid;
+    grid-template-columns: 56px 1fr;
+    gap: 0 20px;
+    animation: fadeUp .5s ease both;
+  }
+  .step:nth-child(1) { animation-delay: .05s }
+  .step:nth-child(2) { animation-delay: .12s }
+  .step:nth-child(3) { animation-delay: .19s }
+  .step:nth-child(4) { animation-delay: .26s }
+  .step:nth-child(5) { animation-delay: .33s }
+  .step:nth-child(6) { animation-delay: .40s }
+  .step:nth-child(7) { animation-delay: .47s }
+
+  /* Vertical connector line */
+  .step-spine {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .step-dot {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Space Mono', monospace;
+    font-size: .85rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    border: 2px solid;
+    position: relative;
+    z-index: 1;
+  }
+  .step-line {
+    width: 2px;
+    flex: 1;
+    min-height: 20px;
+  }
+  .step:last-child .step-line { display: none; }
+
+  /* Step card */
+  .step-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left-width: 3px;
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 16px;
+    transition: transform .2s, box-shadow .2s;
+  }
+  .step-card:hover {
+    transform: translateX(4px);
+    box-shadow: -6px 0 24px rgba(0,0,0,.5);
+  }
+
+  .step-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+  .step-num {
+    font-family: 'Space Mono', monospace;
+    font-size: .72rem;
+    opacity: .5;
+  }
+  .step-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #fff;
+  }
+  .file-tag {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: .72rem;
+    padding: 3px 10px;
+    border-radius: 6px;
+    white-space: nowrap;
+  }
+
+  .step-desc {
+    font-size: .88rem;
+    line-height: 1.6;
+    color: var(--text);
+    opacity: .8;
+    margin-bottom: 12px;
+  }
+
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: .68rem;
+    padding: 3px 9px;
+    border-radius: 4px;
+    background: rgba(255,255,255,.05);
+    border: 1px solid rgba(255,255,255,.1);
+    color: #aaa;
+  }
+
+  /* Color themes per step */
+  .s1 { --c: #e94560; }
+  .s2 { --c: #ff8c42; }
+  .s3 { --c: #ffe135; }
+  .s4 { --c: #00ff9d; }
+  .s5 { --c: #00d4ff; }
+  .s6 { --c: #a78bfa; }
+  .s7 { --c: #ff6eb4; }
+
+  .step .step-dot    { border-color: var(--c); color: var(--c); background: color-mix(in srgb, var(--c) 12%, transparent); }
+  .step .step-line   { background: linear-gradient(var(--c), transparent); opacity: .3; }
+  .step .step-card   { border-left-color: var(--c); }
+  .step .file-tag    { background: color-mix(in srgb, var(--c) 15%, transparent); color: var(--c); border: 1px solid color-mix(in srgb, var(--c) 30%, transparent); }
+
+  /* ── Score weights panel ──────────────────────────────── */
+  .weights-panel {
+    max-width: 900px;
+    margin: 40px auto 0;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px 32px;
+    animation: fadeUp .5s .55s ease both;
+  }
+  .weights-panel h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .weight-row {
+    display: grid;
+    grid-template-columns: 160px 1fr 50px;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 14px;
+  }
+  .weight-label {
+    font-family: 'Space Mono', monospace;
+    font-size: .8rem;
+    color: #aaa;
+  }
+  .weight-bar-bg {
+    height: 8px;
+    background: rgba(255,255,255,.05);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .weight-bar {
+    height: 100%;
+    border-radius: 4px;
+    transition: width .8s cubic-bezier(.16,1,.3,1);
+  }
+  .weight-pct {
+    font-family: 'Space Mono', monospace;
+    font-size: .8rem;
+    text-align: right;
+  }
+
+  /* ── Output panel ─────────────────────────────────────── */
+  .output-row {
+    max-width: 900px;
+    margin: 20px auto 0;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    animation: fadeUp .5s .65s ease both;
+  }
+  .output-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+  }
+  .output-card .icon { font-size: 2rem; margin-bottom: 10px; }
+  .output-card h4 { font-size: .95rem; color: #fff; margin-bottom: 6px; }
+  .output-card p  { font-size: .8rem; color: #666; font-family: 'Space Mono', monospace; }
+
+  /* ── Hackathon tips ───────────────────────────────────── */
+  .tips {
+    max-width: 900px;
+    margin: 20px auto 0;
+    background: linear-gradient(135deg, color-mix(in srgb, #ffe135 8%, var(--panel)), var(--panel));
+    border: 1px solid color-mix(in srgb, #ffe135 25%, transparent);
+    border-radius: 12px;
+    padding: 24px 28px;
+    animation: fadeUp .5s .75s ease both;
+  }
+  .tips h3 { color: var(--yellow); font-size: 1rem; margin-bottom: 16px; }
+  .tips-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 10px;
+  }
+  .tip {
+    background: rgba(0,0,0,.3);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: .82rem;
+    line-height: 1.5;
+    color: #bbb;
+  }
+  .tip strong { color: #fff; display: block; margin-bottom: 3px; }
+
+  /* ── Animations ───────────────────────────────────────── */
+  @keyframes fadeDown {
+    from { opacity: 0; transform: translateY(-20px) }
+    to   { opacity: 1; transform: none }
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px) }
+    to   { opacity: 1; transform: none }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="badge">Hackathon Project</div>
+  <h1>AI Content <span>Repurposing</span> Engine</h1>
+  <p>long-form video → viral short clips, auto-captioned &amp; reframed to 9:16</p>
+</header>
+
+<!-- ── Pipeline Steps ─────────────────────────────────── -->
+<div class="pipeline">
+
+  <div class="step s1">
+    <div class="step-spine">
+      <div class="step-dot">01</div>
+      <div class="step-line"></div>
+    </div>
+    <div class="step-card">
+      <div class="step-header">
+        <span class="step-num">STEP 1</span>
+        <span class="step-title">🎙 Transcribe with Whisper</span>
+        <span class="file-tag">transcriber.py</span>
+      </div>
+      <p class="step-desc">Runs OpenAI Whisper on the source video to produce word-level timestamps. Results are cached as JSON so you don't re-run Whisper on every iteration.</p>
+      <div class="tags">
+        <span class="tag">whisper.load_model()</span>
+        <span class="tag">word_timestamps=True</span>
+        <span class="tag">JSON cache</span>
+        <span class="tag">99 languages</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="step s2">
+    <div class="step-spine">
+      <div class="step-dot">02</div>
+      <div class="step-line"></div>
+    </div>
+    <div class="step-card">
+      <div class="step-header">
+        <span class="step-num">STEP 2</span>
+        <span class="step-title">🔊 Audio Energy Scoring</span>
+        <span class="file-tag">audio_scorer.py</span>
+      </div>
+      <p class="step-desc">Librosa extracts RMS energy, zero-crossing rate, and spectral centroid for each segment. These three signals are combined into a normalized 0–1 audio score that detects laughter, raised voices, and applause.</p>
+      <div class="tags">
+        <span class="tag">librosa.load()</span>
+        <span class="tag">RMS energy</span>
+        <span class="tag">Spectral centroid</span>
+        <span class="tag">ZCR</span>
+        <span class="tag">0–1 normalized</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="step s3">
+    <div class="step-spine">
+      <div class="step-dot">03</div>
+      <div class="step-line"></div>
+    </div>
+    <div class="step-card">
+      <div class="step-header">
+        <span class="step-num">STEP 3</span>
+        <span class="step-title">🪟 Merge into Clip Windows</span>
+        <span class="file-tag">audio_scorer.py</span>
+      </div>
+      <p class="step-desc">Consecutive Whisper segments are merged into clip windows of 20–60 seconds. Each window gets an averaged audio score. This produces the candidate pool for ranking.</p>
+      <div class="tags">
+        <span class="tag">20–60s windows</span>
+        <span class="tag">sliding merge</span>
+        <span class="tag">min/max duration</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="step s4">
+    <div class="step-spine">
+      <div class="step-dot">04</div>
+      <div class="step-line"></div>
+    </div>
+    <div class="step-card">
+      <div class="step-header">
+        <span class="step-num">STEP 4</span>
+        <span class="step-title">🤖 LLM Sentiment + Keyword Scoring</span>
+        <span class="file-tag">llm_scorer.py</span>
+      </div>
+      <p class="step-desc">GPT-4o-mini receives all windows in two batched calls — one for emotional sentiment scoring, one for keyword importance. Results are combined with audio scores using configurable weights into a single final_score.</p>
+      <div class="tags">
+        <span class="tag">gpt-4o-mini</span>
+        <span class="tag">batched JSON</span>
+        <span class="tag">sentiment 0–1</span>
+        <span class="tag">keyword 0–1</span>
+        <span class="tag">composite score</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="step s5">
+    <div class="step-spine">
+      <div class="step-dot">05</div>
+      <div class="step-line"></div>
+    </div>
+    <div class="step-card">
+      <div class="step-header">
+        <span class="step-num">STEP 5</span>
+        <span class="step-title">✂️ Cut Clips with MoviePy</span>
+        <span class="file-tag">clip_cutter.py</span>
+      </div>
+      <p class="step-desc">MoviePy's subclip() extracts the top N ranked windows from the source video with lossless audio passthrough. Clips are named with their rank and score for easy identification.</p>
+      <div class="tags">
+        <span class="tag">moviepy.subclip()</span>
+        <span class="tag">libx264 codec</span>
+        <span class="tag">AAC audio</span>
+        <span class="tag">30fps</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="step s6">
+    <div class="step-spine">
+      <div class="step-dot">06</div>
+      <div class="step-line"></div>
+    </div>
+    <div class="step-card">
+      <div class="step-header">
+        <span class="step-num">STEP 6</span>
+        <span class="step-title">📱 Reframe to 9:16 (MediaPipe)</span>
+        <span class="file-tag">reframer.py</span>
+      </div>
+      <p class="step-desc">MediaPipe face detection samples every 15th frame to find the average face X position. A 9:16 crop window is centered on the face and the result is upscaled to 1080×1920 for TikTok/Reels.</p>
+      <div class="tags">
+        <span class="tag">mediapipe FaceDetection</span>
+        <span class="tag">frame sampling</span>
+        <span class="tag">1080×1920</span>
+        <span class="tag">Lanczos upscale</span>
+        <span class="tag">center fallback</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="step s7">
+    <div class="step-spine">
+      <div class="step-dot">07</div>
+      <div class="step-line"></div>
+    </div>
+    <div class="step-card">
+      <div class="step-header">
+        <span class="step-num">STEP 7</span>
+        <span class="step-title">💬 Captions + Hook Generation</span>
+        <span class="file-tag">caption_burner.py · llm_scorer.py</span>
+      </div>
+      <p class="step-desc">PIL renders word-by-word karaoke captions — the currently-spoken word is highlighted in gold. GPT-4o-mini then generates one viral hook title (≤10 words) per clip to use as the video description.</p>
+      <div class="tags">
+        <span class="tag">PIL ImageDraw</span>
+        <span class="tag">karaoke highlight</span>
+        <span class="tag">CompositeVideoClip</span>
+        <span class="tag">hook title GPT</span>
+        <span class="tag">RGBA overlay</span>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /pipeline -->
+
+<!-- ── Score Weights ───────────────────────────────────── -->
+<div class="weights-panel">
+  <h3>⚖️ Composite Scoring Weights <span style="font-weight:400;color:#555;font-size:.85em;margin-left:8px">(configurable in config.py)</span></h3>
+  <div class="weight-row">
+    <span class="weight-label">🔊 Audio Energy</span>
+    <div class="weight-bar-bg"><div class="weight-bar" style="width:30%;background:#ff8c42"></div></div>
+    <span class="weight-pct" style="color:#ff8c42">30%</span>
+  </div>
+  <div class="weight-row">
+    <span class="weight-label">🤖 LLM Sentiment</span>
+    <div class="weight-bar-bg"><div class="weight-bar" style="width:40%;background:#00ff9d"></div></div>
+    <span class="weight-pct" style="color:#00ff9d">40%</span>
+  </div>
+  <div class="weight-row">
+    <span class="weight-label">🔑 Keyword Score</span>
+    <div class="weight-bar-bg"><div class="weight-bar" style="width:30%;background:#00d4ff"></div></div>
+    <span class="weight-pct" style="color:#00d4ff">30%</span>
+  </div>
+</div>
+
+<!-- ── Outputs ─────────────────────────────────────────── -->
+<div class="output-row">
+  <div class="output-card">
+    <div class="icon">🎬</div>
+    <h4>Vertical Clips</h4>
+    <p>output/clips/<br>9:16 · 1080×1920 · MP4</p>
+  </div>
+  <div class="output-card">
+    <div class="icon">💬</div>
+    <h4>Captioned Clips</h4>
+    <p>output/captions/<br>karaoke word highlight</p>
+  </div>
+  <div class="output-card">
+    <div class="icon">📋</div>
+    <h4>Manifest JSON</h4>
+    <p>scores · hooks · paths<br>per clip</p>
+  </div>
+</div>
+
+<!-- ── Hackathon Tips ──────────────────────────────────── -->
+<div class="tips">
+  <h3>🏆 Hackathon Scoring Tips</h3>
+  <div class="tips-grid">
+    <div class="tip"><strong>Speaker diarization</strong>PyAnnote to detect speaker changes — improves cut timing dramatically</div>
+    <div class="tip"><strong>Thumbnail gen</strong>DALL·E 3 generates a click-worthy thumbnail from the hook title automatically</div>
+    <div class="tip"><strong>Trending audio</strong>Fetch TikTok trend APIs and overlay a matching background track</div>
+    <div class="tip"><strong>Auto-upload</strong>TikTok / Instagram Graph API to post directly from the app — huge wow factor</div>
+    <div class="tip"><strong>A/B hooks</strong>Generate 3 hook variants per clip and let the user pick — shows AI creativity</div>
+    <div class="tip"><strong>Multi-language</strong>Whisper supports 99 languages — add a language selector for global reach</div>
+  </div>
+</div>
+
+</body>
+</html>
